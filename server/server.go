@@ -13,7 +13,6 @@ import (
 const WIDTH = 300
 const HEIGHT = 300
 
-
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 }
@@ -40,9 +39,7 @@ func handleCanvas(w http.ResponseWriter, r *http.Request) {
 			fmt.Printf("Error decoding canvas post: %s\n", err)
 			return
 		}
-		fmt.Printf("got canvas post: %v\n", canvasPost)
 		canvas.SetPixel(canvasPost.I, canvasPost.Colour)
-
 	}
 }
 

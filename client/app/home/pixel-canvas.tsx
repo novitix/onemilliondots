@@ -1,16 +1,10 @@
 import { useEffect, useState, useRef, type PointerEvent, useCallback, type WheelEvent } from "react";
 import { paletteMap } from "./palette";
 import { g } from "./pixels";
-import { base64ToArrayBuffer } from "~/utils/utils";
 import config from "~/config";
+import { decodeCanvas } from "~/utils/decode-canvas";
 
 let pixelSize = config.defaultPixelSize; // Visual size of a pixel
-
-type ApiCanvas = {
-  Pixels: string;
-  Width: number;
-  Height: number;
-};
 
 type ScreenPosition = {
   x: number;
@@ -139,9 +133,9 @@ export function PixelCanvas(props: { colour: number }) {
     }
   };
 
-  const fetchCanvas = async (): Promise<ApiCanvas> => {
+  const fetchCanvas = async () => {
     const response = await fetch(`${config.apiUrl}/canvas`);
-    const data = await response.json();
+    const data = await response.arrayBuffer();
     return data;
   };
 
@@ -156,8 +150,8 @@ export function PixelCanvas(props: { colour: number }) {
 
   useEffect(() => {
     setInterval(() => {
-      fetchCanvas().then((data) => {
-        g.pixels = base64ToArrayBuffer(data.Pixels);
+      fetchCanvas().then(async (data) => {
+        g.pixels = await decodeCanvas(data);
         redraw();
       });
     }, config.refetchInterval);
