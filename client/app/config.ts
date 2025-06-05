@@ -5,7 +5,7 @@ const config = {
   canvasHeight: 300,
   defaultPixelSize: 20,
   zoom: {
-    speed: 5, // Pixel change per scroll event
+    speed: 1, // Pixel change per scroll event
     minimum: 5, // Minimum pixel size
     maximum: 50, // Maximum pixel size
   },

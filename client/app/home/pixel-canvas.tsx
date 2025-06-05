@@ -22,8 +22,8 @@ let canvasScroll: GridPosition = { x: 0, y: 0 };
 let pointerDownPos: ScreenPosition | null = null;
 let canvasScrollAtPointerDown: GridPosition | null = null;
 
-let viewportWidth: number | null = null;
-let viewportHeight: number | null = null;
+let viewportFitGridX: number | null = null;
+let viewportFitGridY: number | null = null;
 
 export function PixelCanvas(props: { colour: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -36,10 +36,12 @@ export function PixelCanvas(props: { colour: number }) {
     if (!ctx) return;
     const startTime = performance.now();
 
-    ctx!.clearRect(0, 0, config.canvasWidth * pixelSize, config.canvasHeight * pixelSize);
+    ctx!.clearRect(0, 0, canvas.current.width, canvas.current.height);
 
-    for (let x = 0; x < viewportWidth!; x++) {
-      for (let y = 0; y < viewportHeight!; y++) {
+    // We may zoom out, making the canvas smaller than the viewport
+
+    for (let x = 0; x < Math.min(viewportFitGridX!, config.canvasWidth); x++) {
+      for (let y = 0; y < viewportFitGridY!; y++) {
         ctx!.fillStyle =
           paletteMap.get(g.pixels![x + canvasScroll.x + (y + canvasScroll.y) * config.canvasWidth]) || "#000000";
         ctx!.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
@@ -55,8 +57,21 @@ export function PixelCanvas(props: { colour: number }) {
     // console.log(`Redraw took ${endTime - startTime}ms`);
   };
 
+  const tryMoveCanvas = (newCanvasScroll: GridPosition) => {
+    if (!canvas.current || !viewportFitGridY || !viewportFitGridX)
+      throw new Error("Canvas not found in tryMoveCanvas()");
+
+    if (newCanvasScroll.x < 0) newCanvasScroll.x = 0;
+    if (newCanvasScroll.y < 0) newCanvasScroll.y = 0;
+    if (newCanvasScroll.x + viewportFitGridX > config.canvasWidth + 1)
+      newCanvasScroll.x = Math.max(config.canvasWidth + 1 - viewportFitGridX, 0);
+    if (newCanvasScroll.y + viewportFitGridY > config.canvasHeight + 1)
+      newCanvasScroll.y = Math.max(config.canvasHeight + 1 - viewportFitGridY, 0);
+    return newCanvasScroll;
+  };
+
   const onPointerMove = (e: PointerEvent<HTMLCanvasElement>) => {
-    if (!canvas.current || !viewportHeight || !viewportWidth) return;
+    if (!canvas.current || !viewportFitGridY || !viewportFitGridX) return;
     let needsRedraw = false;
     if (pointerDownPos && canvasScrollAtPointerDown && e.buttons === 1) {
       // Dragging
@@ -66,17 +81,11 @@ export function PixelCanvas(props: { colour: number }) {
       };
       if (delta.x === 0 && delta.y === 0) return;
 
-      const newCanvasScroll: GridPosition = {
+      const newCanvasScroll: GridPosition = tryMoveCanvas({
         x: canvasScrollAtPointerDown.x + delta.x,
         y: canvasScrollAtPointerDown.y + delta.y,
-      };
+      });
 
-      if (newCanvasScroll.x < 0) newCanvasScroll.x = 0;
-      if (newCanvasScroll.y < 0) newCanvasScroll.y = 0;
-      if (newCanvasScroll.x + viewportWidth > config.canvasWidth + 1)
-        newCanvasScroll.x = config.canvasWidth + 1 - viewportWidth;
-      if (newCanvasScroll.y + viewportHeight > config.canvasHeight + 1)
-        newCanvasScroll.y = config.canvasHeight + 1 - viewportHeight;
       needsRedraw = newCanvasScroll.x !== canvasScroll.x || newCanvasScroll.y !== canvasScroll.y;
       canvasScroll = newCanvasScroll;
     }
@@ -163,8 +172,8 @@ export function PixelCanvas(props: { colour: number }) {
     canvas.current.style.height = "100%";
     canvas.current.width = canvas.current.offsetWidth;
     canvas.current.height = canvas.current.offsetHeight;
-    viewportWidth = Math.floor(canvas.current.width / pixelSize) + 1;
-    viewportHeight = Math.floor(canvas.current.height / pixelSize) + 1;
+    viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
+    viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
   }, [canvas.current]);
 
   return (
@@ -185,11 +194,11 @@ export function PixelCanvas(props: { colour: number }) {
             pixelSize += config.zoom.speed;
           }
           if (canvas.current) {
-            viewportWidth = Math.floor(canvas.current.width / pixelSize) + 1;
-            viewportHeight = Math.floor(canvas.current.height / pixelSize) + 1;
+            viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
+            viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
           }
-          hoveredPixel = getMouseOnCanvasPixel(e);
-
+          canvasScroll = tryMoveCanvas(canvasScroll);
+          if (canvasScroll.x) hoveredPixel = getMouseOnCanvasPixel(e);
           redraw();
         }}
       >
