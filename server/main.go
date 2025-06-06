@@ -49,7 +49,7 @@ func main() {
 	http.HandleFunc("/", getRoot)
 	http.HandleFunc("/canvas", handleCanvas)
 
-	err := http.ListenAndServe(":3333", nil)
+	err := http.ListenAndServe(":3000", nil)
 	if errors.Is(err, http.ErrServerClosed) {
 		fmt.Printf("server closed\n")
 	} else if err != nil {
