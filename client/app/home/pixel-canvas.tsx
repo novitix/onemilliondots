@@ -143,6 +143,7 @@ export function PixelCanvas(props: { colour: number }) {
   };
 
   const fetchCanvas = async () => {
+    console.log(`"${config.apiUrl}"`);
     const response = await fetch(`${config.apiUrl}/canvas`);
     const data = await response.arrayBuffer();
     return data;

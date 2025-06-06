@@ -1,11 +1,18 @@
 version: '3.8'
 
 services:
-  app:
+  server:
     build:
       context: ./server
       dockerfile: Dockerfile
     container_name: canvas-server
     ports:
-      - "3000:3000"
+      - "80:80"
     command: ./server
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: canvas-client
+    ports:
+      - "3000:3000"
