@@ -10,8 +10,8 @@ import (
 	"os"
 )
 
-const WIDTH = 300
-const HEIGHT = 300
+const WIDTH = 1000
+const HEIGHT = 1000
 
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")

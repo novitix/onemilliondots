@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM golang:1.24.2 AS build
+FROM --platform=$BUILDPLATFORM golang:1.24.2-alpine AS build
 
 WORKDIR /
 COPY . .
@@ -18,7 +18,11 @@ RUN CGO_ENABLED=0 go build -o server main.go
 # EOF
 # install Docker tools (cli, buildx, compose)
 # COPY --from=gloursdocker/docker / /
-CMD ["go", "run", "main.go"]
+FROM scratch
+WORKDIR /
+COPY --from=build server server
+EXPOSE 80
+ENTRYPOINT [ "./server" ]
 
 # FROM scratch
 # COPY --from=build /compose/hello-docker/backend /usr/local/bin/backend

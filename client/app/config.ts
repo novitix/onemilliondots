@@ -1,8 +1,8 @@
 const config = {
   apiUrl: import.meta.env.VITE_API_URL,
   refetchInterval: 1000, // ms
-  canvasWidth: 300,
-  canvasHeight: 300,
+  canvasWidth: 1000,
+  canvasHeight: 1000,
   defaultPixelSize: 20,
   zoom: {
     speed: 1, // Pixel change per scroll event
