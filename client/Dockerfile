@@ -15,6 +15,10 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build
 
 FROM base
+# Define build arguments
+ARG VITE_API_URL
+# Pass env vars to Vite
+ENV VITE_API_URL=$VITE_API_URL
 WORKDIR /app
 COPY --from=source app/package.json package.json
 COPY --from=prod-deps app/node_modules node_modules

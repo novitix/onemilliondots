@@ -28,7 +28,7 @@ jobs:
 
       - name: Build and Push Frontend
         run: |
-          docker buildx build --platform linux/arm64 -t novitix/canvas-client:latest ./client --output=type=registry
+          docker buildx build --build-arg "${{ vars.VITE_API_URL }}" --platform linux/arm64 -t novitix/canvas-client:latest ./client --output=type=registry
 
       - name: Build and Push Backend
         run: |
