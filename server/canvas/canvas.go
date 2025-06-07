@@ -2,7 +2,9 @@ package canvas
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 )
 
 type canvas struct {
@@ -41,8 +43,13 @@ func InitCanvas(height int, width int) error {
 func GetCanvas(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Getting canvas\n")
 	w.Header().Set("Content-Type", "application/octet-stream")
+	start := time.Now()
 
 	_, err := w.Write(mainCanvas.Pixels)
+
+	elapsed := time.Since(start)
+	log.Printf("Write took %s", elapsed)
+
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error getting canvas: %s", err), http.StatusInternalServerError)
 		return
