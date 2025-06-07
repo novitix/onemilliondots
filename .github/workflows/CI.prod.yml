@@ -2,12 +2,11 @@ name: Docker Image CI & Push to Docker Hub
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
 
 jobs:
-
   build:
     environment: prod
     runs-on: ubuntu-latest
@@ -21,13 +20,11 @@ jobs:
 
       - name: Build and Push Frontend
         run: |
-          docker build -t novitix/canvas-client:latest ./client
-          docker push novitix/canvas-client:latest
+          docker buildx build --platform linux/amd64,linux/arm64 -t novitix/canvas-client:latest ./client --output=type=registry
 
       - name: Build and Push Backend
         run: |
-          docker build -t novitix/canvas-server:latest ./server
-          docker push novitix/canvas-server:latest
+          docker buildx build --platform linux/amd64,linux/arm64 -t novitix/canvas-server:latest ./server --output=type=registry
 
       # - name: SSH into VPS and deploy
       #   run: |
