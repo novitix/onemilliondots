@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  server:
+    image: novitix/canvas-server
+    container_name: canvas-server
+    ports:
+      - "80:80"
+    command: ./server
+  client:
+    image: novitix/canvas-client
+    container_name: canvas-client
+    ports:
+      - "3000:3000"
