@@ -1,4 +1,4 @@
-name: Docker Image CI & Deploy to Swift5 Server
+name: Docker Image CI & Push to Docker Hub
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
 
   build:
-
+    environment: prod
     runs-on: ubuntu-latest
 
     steps:
