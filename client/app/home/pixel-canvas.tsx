@@ -187,13 +187,12 @@ export function PixelCanvas(props: { colour: number }) {
     canvas.current.height = canvas.current.offsetHeight;
     viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
     viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
-  }, [canvas.current]);
+  }, [canvas.current, canvas.current?.offsetWidth, canvas.current?.offsetHeight]);
 
   return (
-    <div className="w-full border h-full">
+    <div className="w-full border h-full rounded-sm border-white/30">
       <canvas
         ref={canvas}
-        className="border"
         onPointerMove={onPointerMove}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}

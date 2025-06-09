@@ -7,11 +7,12 @@ export function Home() {
 
   return (
     <main className="flex items-center justify-start pt-16 pb-4 flex-col gap-3 max-w-screen h-screen">
-      <h1 className="text-3xl">Canva - Draw in real-time with other users</h1>
+      <div>
+        <h1 className="text-3xl">One Million Dots</h1>
+        <p>Draw live with other users</p>
+      </div>
       <Picker colour={selectedColour} onColourChange={setSelectedColour} />
-      <PixelCanvas
-        colour={selectedColour}
-      />
+      <PixelCanvas colour={selectedColour} />
     </main>
   );
 }

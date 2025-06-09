@@ -1,4 +1,4 @@
-name: Docker Image CI & Push to Docker Hub
+name: Client CI & Push to Docker Hub
 
 on:
   push:
@@ -33,10 +33,6 @@ jobs:
       - name: Build and Push Frontend
         run: |
           docker buildx build --build-arg "${{ vars.VITE_API_URL }}" --platform linux/arm64,linux/amd64 -t novitix/canvas-client:latest ./client --output=type=registry
-
-      - name: Build and Push Backend
-        run: |
-          docker buildx build --platform linux/arm64,linux/amd64  -t novitix/canvas-server:latest ./server --output=type=registry
 
       # - name: SSH into VPS and deploy
       #   run: |
