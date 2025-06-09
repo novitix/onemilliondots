@@ -1,14 +1,20 @@
 package canvas
 
 import (
+	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-	"time"
 )
+
+type Edit struct {
+	Uuid   string
+	I      int
+	Colour byte
+}
 
 type canvas struct {
 	Pixels []byte
+	Edits  []Edit
 	Width  int
 	Height int
 }
@@ -30,6 +36,7 @@ func InitCanvas(height int, width int) error {
 
 	mainCanvas = canvas{
 		Pixels: make([]byte, height*width/2),
+		Edits:  make([]Edit, 0),
 		Width:  width,
 		Height: height,
 	}
@@ -40,15 +47,11 @@ func InitCanvas(height int, width int) error {
 	return nil
 }
 
-func GetCanvas(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Getting canvas\n")
+func GetFullCanvas(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("Getting full canvas\n")
+
 	w.Header().Set("Content-Type", "application/octet-stream")
-	start := time.Now()
-
 	_, err := w.Write(mainCanvas.Pixels)
-
-	elapsed := time.Since(start)
-	log.Printf("Write took %s", elapsed)
 
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error getting canvas: %s", err), http.StatusInternalServerError)
@@ -56,17 +59,38 @@ func GetCanvas(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// i is the pixel position
-// color should be a nibble (4 bits) colour
-func SetPixel(i int, color byte) {
-	fmt.Printf("Set pixel %d - Color %d\n", i, color)
+func GetEdits(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("Getting edits\n")
 
-	isPixelHigh := i%2 == 0
-	bytePosition := i / 2
+	w.Header().Set("Content-Type", "application/json")
 
-	if isPixelHigh {
-		mainCanvas.Pixels[bytePosition] = (color << 4) | getLowNibble(mainCanvas.Pixels[bytePosition])
-	} else {
-		mainCanvas.Pixels[bytePosition] = getHighNibble(mainCanvas.Pixels[bytePosition])<<4 | color
+	content, marshalErr := json.Marshal(mainCanvas.Edits)
+	if marshalErr != nil {
+		http.Error(w, fmt.Sprintf("Error getting edits: %s", marshalErr), http.StatusInternalServerError)
 	}
+
+	_, writeErr := w.Write(content)
+	if writeErr != nil {
+		http.Error(w, fmt.Sprintf("Error getting canvas: %s", writeErr), http.StatusInternalServerError)
+	}
+}
+
+// i is the pixel position
+// color should be between 0-15
+func CreateEdit(uuid string, i int, color byte) {
+	fmt.Printf("Set pixel %d - Color %d\n", i, color)
+	mainCanvas.Edits = append(mainCanvas.Edits, Edit{
+		Uuid:   uuid,
+		I:      i,
+		Colour: color,
+	})
+
+	// isPixelHigh := i%2 == 0
+	// bytePosition := i / 2
+
+	// if isPixelHigh {
+	// 	mainCanvas.Pixels[bytePosition] = (color << 4) | getLowNibble(mainCanvas.Pixels[bytePosition])
+	// } else {
+	// 	mainCanvas.Pixels[bytePosition] = getHighNibble(mainCanvas.Pixels[bytePosition])<<4 | color
+	// }
 }

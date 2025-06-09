@@ -2,9 +2,16 @@ import { useEffect, useState, useRef, type PointerEvent, useCallback, type Wheel
 import { paletteMap } from "./palette";
 import { g } from "./pixels";
 import config from "~/config";
-import { decodeCanvas } from "~/utils/decode-canvas";
+import { applyEdits, decodeCanvas } from "~/utils/decode-canvas";
+import { v4 as uuidv4 } from "uuid";
 
 let pixelSize = config.defaultPixelSize; // Visual size of a pixel
+
+export type Edit = {
+  Uuid: string;
+  I: number;
+  Colour: number;
+};
 
 type ScreenPosition = {
   x: number;
@@ -34,7 +41,7 @@ export function PixelCanvas(props: { colour: number }) {
       ctx = canvas.current?.getContext("2d") || null;
     }
     if (!ctx) return;
-    const startTime = performance.now();
+    // const startTime = performance.now();
 
     ctx!.clearRect(0, 0, canvas.current.width, canvas.current.height);
 
@@ -53,7 +60,7 @@ export function PixelCanvas(props: { colour: number }) {
     ctx!.strokeStyle = "#000";
     ctx!.strokeRect(hoveredPixel?.x * pixelSize, hoveredPixel?.y * pixelSize, pixelSize, pixelSize);
 
-    const endTime = performance.now();
+    // const endTime = performance.now();
     // console.log(`Redraw took ${endTime - startTime}ms`);
   };
 
@@ -142,28 +149,33 @@ export function PixelCanvas(props: { colour: number }) {
     }
   };
 
-  const fetchCanvas = async () => {
-    console.log(`"${config.apiUrl}"`);
-    const response = await fetch(`${config.apiUrl}/canvas`);
-    const data = await response.arrayBuffer();
-    return data;
+  const fetchCanvasFull = async () => {
+    const canvasFull = await fetch(`${config.apiUrl}/canvas/full`).then((data) => data.arrayBuffer());
+    const canvasEdits: Edit[] = await fetch(`${config.apiUrl}/canvas/edits`).then((data) => data.json());
+    const pixelArray = await decodeCanvas(canvasFull, canvasEdits);
+    return pixelArray;
   };
 
   const setPixel = (i: number, colour: number) => {
     if (!g.pixels) return;
     g.pixels[i] = colour;
-    fetch(`${config.apiUrl}/canvas`, {
+    fetch(`${config.apiUrl}/canvas/edits`, {
       method: "POST",
-      body: JSON.stringify({ i, colour }),
+      body: JSON.stringify({ i, colour, uuid: uuidv4() }),
     });
   };
 
   useEffect(() => {
-    setInterval(() => {
-      fetchCanvas().then(async (data) => {
-        g.pixels = await decodeCanvas(data);
-        redraw();
-      });
+    fetchCanvasFull().then(async (data) => {
+      g.pixels = data;
+      redraw();
+    });
+
+    setInterval(async () => {
+      if (!g.pixels) return;
+      const canvasEdits: Edit[] = await fetch(`${config.apiUrl}/canvas/edits`).then((data) => data.json());
+      applyEdits(g.pixels, canvasEdits);
+      redraw();
     }, config.refetchInterval);
   }, []);
 
