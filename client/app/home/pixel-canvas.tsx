@@ -189,6 +189,10 @@ export function PixelCanvas(props: { colour: number }) {
     viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
   }, [canvas.current, canvas.current?.offsetWidth, canvas.current?.offsetHeight]);
 
+  useEffect(() => {
+    redraw();
+  });
+
   return (
     <div className="w-full border h-full rounded-sm border-white/30">
       <canvas
