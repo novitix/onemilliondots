@@ -6,9 +6,15 @@ services:
     container_name: canvas-server
     ports:
       - "1234:1234"
-    command: ./server
   client:
     image: novitix/canvas-client
     container_name: canvas-client
     ports:
       - "3000:3000"
+    volumes:
+      - type: bind
+      - source: /work/config.json
+      - target: /app
+volumes:
+  config:
+  
