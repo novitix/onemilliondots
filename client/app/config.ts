@@ -1,7 +1,5 @@
-const configJson = await import("../config/config.json");
-
 const config = {
-  apiUrl: configJson.apiUrl,
+  apiUrl: import.meta.env.VITE_API_URL,
   refetchInterval: 1000, // ms
   canvasWidth: 1000,
   canvasHeight: 1000,
