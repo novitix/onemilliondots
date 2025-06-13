@@ -4,6 +4,7 @@ import { g } from "./pixels";
 import config from "~/config";
 import { applyEdits, decodeCanvas } from "~/utils/decode-canvas";
 import { v4 as uuidv4 } from "uuid";
+import { useWindowSize } from "~/hooks/use-window-size";
 
 let pixelSize = config.defaultPixelSize; // Visual size of a pixel
 
@@ -33,6 +34,7 @@ let viewportFitGridX: number | null = null;
 let viewportFitGridY: number | null = null;
 
 export function PixelCanvas(props: { colour: number }) {
+  const [windowWidth, windowHeight] = useWindowSize();
   const canvas = useRef<HTMLCanvasElement>(null);
 
   const redraw = () => {
@@ -181,25 +183,28 @@ export function PixelCanvas(props: { colour: number }) {
 
   useEffect(() => {
     if (!canvas.current) return;
-    canvas.current.style.width = "100%";
-    canvas.current.style.height = "100%";
-    canvas.current.width = canvas.current.offsetWidth;
-    canvas.current.height = canvas.current.offsetHeight;
+    canvas.current.width = canvas.current.clientWidth;
+    canvas.current.height = canvas.current.clientHeight;
+    console.log(canvas.current.offsetHeight);
     viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
     viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
-  }, [canvas.current, canvas.current?.offsetWidth, canvas.current?.offsetHeight]);
+  }, [canvas.current, canvas.current?.clientWidth, canvas.current?.clientHeight]);
 
   useEffect(() => {
     redraw();
   });
+  useEffect(() => {
+    redraw();
+  }, [windowWidth, windowHeight]);
 
   return (
-    <div className="w-full border h-full rounded-sm border-white/30">
+    <div className="w-full h-full rounded-sm border-white/30 border overflow-y-hidden">
       <canvas
         ref={canvas}
         onPointerMove={onPointerMove}
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
+        className="w-full h-full"
         onWheel={(e) => {
           const zoomOut = e.deltaY > 0;
           if (zoomOut) {

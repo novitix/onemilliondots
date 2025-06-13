@@ -1,5 +1,6 @@
 import type { Edit } from "~/home/pixel-canvas";
 
+const appliedEdits = [];
 export async function decodeCanvas(canvasFull: ArrayBuffer, canvasEdits: Edit[]) {
   const bytes = new Uint8Array(canvasFull);
   const bytesLength = bytes.length;
@@ -16,6 +17,8 @@ export async function decodeCanvas(canvasFull: ArrayBuffer, canvasEdits: Edit[])
 }
 
 export async function applyEdits(canvasFull: Uint8Array<ArrayBuffer>, canvasEdits: Edit[]) {
+  if (!canvasEdits) return;
+
   canvasEdits.forEach((edit) => {
     canvasFull[edit.I] = edit.Colour;
   });

@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+const EDITS_BEFORE_CONSOLIDATE = 20
+
 type Edit struct {
 	Uuid   string
 	I      int
@@ -85,12 +87,21 @@ func CreateEdit(uuid string, i int, color byte) {
 		Colour: color,
 	})
 
-	// isPixelHigh := i%2 == 0
-	// bytePosition := i / 2
+	if len(mainCanvas.Edits) >= EDITS_BEFORE_CONSOLIDATE {
+		ConsolidateEdits()
+	}
+}
 
-	// if isPixelHigh {
-	// 	mainCanvas.Pixels[bytePosition] = (color << 4) | getLowNibble(mainCanvas.Pixels[bytePosition])
-	// } else {
-	// 	mainCanvas.Pixels[bytePosition] = getHighNibble(mainCanvas.Pixels[bytePosition])<<4 | color
-	// }
+func ConsolidateEdits() {
+	for _, edit := range mainCanvas.Edits {
+		isPixelHigh := edit.I%2 == 0
+		bytePosition := edit.I / 2
+
+		if isPixelHigh {
+			mainCanvas.Pixels[bytePosition] = (edit.Colour << 4) | getLowNibble(mainCanvas.Pixels[bytePosition])
+		} else {
+			mainCanvas.Pixels[bytePosition] = getHighNibble(mainCanvas.Pixels[bytePosition])<<4 | edit.Colour
+		}
+	}
+	mainCanvas.Edits = nil
 }
