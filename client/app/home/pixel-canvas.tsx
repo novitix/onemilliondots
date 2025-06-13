@@ -29,6 +29,8 @@ let ctx: CanvasRenderingContext2D | null = null;
 let canvasScroll: GridPosition = { x: 0, y: 0 };
 let pointerDownPos: ScreenPosition | null = null;
 let canvasScrollAtPointerDown: GridPosition | null = null;
+let lastPinchDistance: number | null = null;
+let pixelSizeAtPinchStart: number | null = null;
 
 let viewportFitGridX: number | null = null;
 let viewportFitGridY: number | null = null;
@@ -139,16 +141,14 @@ export function PixelCanvas(props: { colour: number }) {
     canvasScrollAtPointerDown = null;
   };
 
-  const onPointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
+  const onPointerDown = (pageX: number, pageY: number) => {
     if (!canvas.current) return;
 
-    if (e.buttons === 1) {
-      pointerDownPos = {
-        x: e.pageX,
-        y: e.pageY,
-      };
-      canvasScrollAtPointerDown = { x: canvasScroll.x, y: canvasScroll.y };
-    }
+    pointerDownPos = {
+      x: pageX,
+      y: pageY,
+    };
+    canvasScrollAtPointerDown = { x: canvasScroll.x, y: canvasScroll.y };
   };
 
   const fetchCanvasFull = async () => {
@@ -185,9 +185,23 @@ export function PixelCanvas(props: { colour: number }) {
     if (!canvas.current) return;
     canvas.current.width = canvas.current.clientWidth;
     canvas.current.height = canvas.current.clientHeight;
-    console.log(canvas.current.offsetHeight);
     viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
     viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
+
+    canvas.current?.addEventListener("gesturestart", function (e) {
+      e.preventDefault();
+      document.body.style.zoom = "1";
+    });
+
+    canvas.current?.addEventListener("gesturechange", function (e) {
+      e.preventDefault();
+
+      document.body.style.zoom = "1";
+    });
+    canvas.current?.addEventListener("gestureend", function (e) {
+      e.preventDefault();
+      document.body.style.zoom = "1";
+    });
   }, [canvas.current, canvas.current?.clientWidth, canvas.current?.clientHeight]);
 
   useEffect(() => {
@@ -198,13 +212,59 @@ export function PixelCanvas(props: { colour: number }) {
   }, [windowWidth, windowHeight]);
 
   return (
-    <div className="w-full h-full rounded-sm border-white/30 border overflow-y-hidden">
+    <div className="w-full h-full rounded-sm border-white/30 border-8 overflow-y-hidden">
       <canvas
         ref={canvas}
         onPointerMove={onPointerMove}
-        onPointerDown={onPointerDown}
+        onPointerDown={(e) => {
+          if (e.buttons === 1) {
+            onPointerDown(e.pageX, e.pageY);
+          }
+        }}
         onPointerUp={onPointerUp}
         className="w-full h-full"
+        onTouchStart={(e) => {
+          if (e.touches.length > 1) return; // Ignore multi-touch gestures
+          const touch = e.touches[0];
+          onPointerDown(touch.pageX, touch.pageY);
+        }}
+        onTouchMove={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          if (e.touches.length === 1) {
+            // Dragging
+            const touch = e.touches[0];
+            const delta: GridPosition = {
+              x: Math.floor((pointerDownPos!.x - touch.pageX) / pixelSize),
+              y: Math.floor((pointerDownPos!.y - touch.pageY) / pixelSize),
+            };
+            if (delta.x === 0 && delta.y === 0) return;
+            const newCanvasScroll: GridPosition = tryMoveCanvas({
+              x: canvasScrollAtPointerDown!.x + delta.x,
+              y: canvasScrollAtPointerDown!.y + delta.y,
+            });
+            if (newCanvasScroll.x !== canvasScroll.x || newCanvasScroll.y !== canvasScroll.y) {
+              canvasScroll = newCanvasScroll;
+              redraw();
+            }
+          } else if (e.touches.length === 2) {
+            // Handle pinch-to-zoom
+            const currentPinchDistance = Math.hypot(
+              e.touches[0].pageX - e.touches[1].pageX,
+              e.touches[0].pageY - e.touches[1].pageY
+            );
+            if (!lastPinchDistance) {
+              lastPinchDistance = currentPinchDistance;
+              pixelSizeAtPinchStart = pixelSize;
+              return;
+            }
+
+            pixelSize =
+              Math.round((pixelSizeAtPinchStart! * (currentPinchDistance / lastPinchDistance)) / config.zoom.speed) *
+              config.zoom.speed;
+          }
+        }}
+        // onTouchEnd={(e) =>}
         onWheel={(e) => {
           const zoomOut = e.deltaY > 0;
           if (zoomOut) {

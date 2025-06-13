@@ -6,7 +6,7 @@ export function Home() {
   const [selectedColour, setSelectedColour] = useState(0);
 
   return (
-    <main className="flex items-center justify-start pt-16 flex-col gap-3 max-w-screen h-full">
+    <main className="flex items-center justify-start pt-4 xl:pt-16 flex-col gap-3 max-w-screen h-svh">
       <div>
         <h1 className="text-3xl">One Million Dots</h1>
         <p>Draw live with other users</p>
