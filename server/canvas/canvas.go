@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
-const EDITS_BEFORE_CONSOLIDATE = 20
+const WAIT_BEFORE_CLEAR = 1500 // ms - should be longer than the client refetch interval
+const CONSOLIDATE_INTERVAL = 5000 // ms - how often to consolidate edits
 
 type Edit struct {
 	Uuid   string
@@ -46,6 +48,7 @@ func InitCanvas(height int, width int) error {
 		mainCanvas.Pixels[i] = 0b11111111 // 2 pixels per byte, initialise both pixels to 15.
 	}
 
+	go startConsolidation()
 	return nil
 }
 
@@ -62,8 +65,6 @@ func GetFullCanvas(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetEdits(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Getting edits\n")
-
 	w.Header().Set("Content-Type", "application/json")
 
 	content, marshalErr := json.Marshal(mainCanvas.Edits)
@@ -86,13 +87,15 @@ func CreateEdit(uuid string, i int, color byte) {
 		I:      i,
 		Colour: color,
 	})
+}
 
-	if len(mainCanvas.Edits) >= EDITS_BEFORE_CONSOLIDATE {
-		ConsolidateEdits()
+func startConsolidation() {
+	for range time.Tick(CONSOLIDATE_INTERVAL * time.Millisecond) {
+		consolidateEdits()
 	}
 }
 
-func ConsolidateEdits() {
+func consolidateEdits() {
 	for _, edit := range mainCanvas.Edits {
 		isPixelHigh := edit.I%2 == 0
 		bytePosition := edit.I / 2
@@ -103,5 +106,15 @@ func ConsolidateEdits() {
 			mainCanvas.Pixels[bytePosition] = getHighNibble(mainCanvas.Pixels[bytePosition])<<4 | edit.Colour
 		}
 	}
-	mainCanvas.Edits = nil
+
+	// Ensure all users have received the latest edits before clearing
+	count := len(mainCanvas.Edits)
+	if count <= 0 || count > len(mainCanvas.Edits) {
+		return
+	}
+	
+	time.Sleep((WAIT_BEFORE_CLEAR) * time.Millisecond)
+
+	mainCanvas.Edits = mainCanvas.Edits[count:] // Clear the edits that have been consolidated
+	fmt.Printf("Consolidated and cleared %d edits\n", count)
 }
