@@ -5,8 +5,9 @@ import config from "~/config";
 import { applyEdits, decodeCanvas } from "~/utils/decode-canvas";
 import { v4 as uuidv4 } from "uuid";
 import { useWindowSize } from "~/hooks/use-window-size";
+import { isTouchScreen } from "~/hooks/is-touch-screen";
 
-let pixelSize = config.defaultPixelSize; // Visual size of a pixel
+let pixelSize = 0; // Visual size of a pixel; This gets set in useEffect based on the screen type (touch or non-touch)
 
 export type Edit = {
   Uuid: string;
@@ -39,6 +40,8 @@ export function PixelCanvas(props: { colour: number }) {
   const [windowWidth, windowHeight] = useWindowSize();
   const canvas = useRef<HTMLCanvasElement>(null);
 
+  const isTouch = isTouchScreen();
+
   const redraw = () => {
     if (!canvas.current || !g.pixels) return;
     if (!ctx) {
@@ -59,13 +62,28 @@ export function PixelCanvas(props: { colour: number }) {
       }
     }
 
-    if (!hoveredPixel) return;
+    if (!hoveredPixel || isTouch) return;
     ctx!.lineWidth = 1;
     ctx!.strokeStyle = "#000";
     ctx!.strokeRect(hoveredPixel?.x * pixelSize, hoveredPixel?.y * pixelSize, pixelSize, pixelSize);
 
     // const endTime = performance.now();
     // console.log(`Redraw took ${endTime - startTime}ms`);
+  };
+
+  const onZoomChange = (zoom: number, newHoveredPixel?: GridPosition) => {
+    if (pixelSize + zoom < config.zoom.minimum || pixelSize + zoom > config.zoom.maximum) return;
+    pixelSize += zoom;
+
+    if (canvas.current) {
+      viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
+      viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
+    }
+    canvasScroll = tryMoveCanvas(canvasScroll);
+    if (newHoveredPixel) {
+      hoveredPixel = newHoveredPixel;
+    }
+    redraw();
   };
 
   const tryMoveCanvas = (newCanvasScroll: GridPosition) => {
@@ -102,18 +120,18 @@ export function PixelCanvas(props: { colour: number }) {
     }
 
     // Hovering pixel
-    const curHoveredPixel = getMouseOnCanvasPixel(e);
+    const curHoveredPixel = getMouseOnCanvasPixel({ x: e.pageX, y: e.pageY });
     if (curHoveredPixel.x !== hoveredPixel?.x || curHoveredPixel.y !== hoveredPixel?.y) needsRedraw = true;
     hoveredPixel = curHoveredPixel;
 
     if (needsRedraw) redraw();
   };
 
-  const getMouseOnCanvasPixel = (e: PointerEvent<HTMLCanvasElement> | WheelEvent<HTMLCanvasElement>) => {
+  const getMouseOnCanvasPixel = (position: ScreenPosition) => {
     if (!canvas.current) throw new Error("canvas not initialized");
 
-    const x = Math.floor((e.pageX - canvas.current.offsetLeft + canvas.current.scrollLeft) / pixelSize);
-    const y = Math.floor((e.pageY - canvas.current.offsetTop + canvas.current.scrollTop) / pixelSize);
+    const x = Math.floor((position.x - canvas.current.offsetLeft + canvas.current.scrollLeft) / pixelSize);
+    const y = Math.floor((position.y - canvas.current.offsetTop + canvas.current.scrollTop) / pixelSize);
     return { x, y };
   };
 
@@ -168,6 +186,11 @@ export function PixelCanvas(props: { colour: number }) {
   };
 
   useEffect(() => {
+    if (isTouchScreen()) {
+      pixelSize = config.touchPixelSize; // Use a smaller pixel size for touch screens
+    } else {
+      pixelSize = config.defaultPixelSize; // Use the default pixel size for non-touch screens
+    }
     fetchCanvasFull().then(async (data) => {
       g.pixels = data;
       redraw();
@@ -187,21 +210,6 @@ export function PixelCanvas(props: { colour: number }) {
     canvas.current.height = canvas.current.clientHeight;
     viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
     viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
-
-    canvas.current?.addEventListener("gesturestart", function (e) {
-      e.preventDefault();
-      document.body.style.zoom = "1";
-    });
-
-    canvas.current?.addEventListener("gesturechange", function (e) {
-      e.preventDefault();
-
-      document.body.style.zoom = "1";
-    });
-    canvas.current?.addEventListener("gestureend", function (e) {
-      e.preventDefault();
-      document.body.style.zoom = "1";
-    });
   }, [canvas.current, canvas.current?.clientWidth, canvas.current?.clientHeight]);
 
   useEffect(() => {
@@ -212,23 +220,25 @@ export function PixelCanvas(props: { colour: number }) {
   }, [windowWidth, windowHeight]);
 
   return (
-    <div className="w-full h-full rounded-sm border-white/30 border-8 overflow-y-hidden">
+    <div className="w-full h-full rounded-sm border-white/30 border overflow-y-hidden">
       <canvas
         ref={canvas}
+        className="w-full h-full touch-auto"
         onPointerMove={onPointerMove}
         onPointerDown={(e) => {
           if (e.buttons === 1) {
+            console.log("Pointer down", e.pageX, e.pageY);
             onPointerDown(e.pageX, e.pageY);
           }
         }}
         onPointerUp={onPointerUp}
-        className="w-full h-full"
         onTouchStart={(e) => {
           if (e.touches.length > 1) return; // Ignore multi-touch gestures
           const touch = e.touches[0];
           onPointerDown(touch.pageX, touch.pageY);
         }}
         onTouchMove={(e) => {
+          if (!canvas.current) return;
           e.stopPropagation();
           e.preventDefault();
           if (e.touches.length === 1) {
@@ -245,6 +255,7 @@ export function PixelCanvas(props: { colour: number }) {
             });
             if (newCanvasScroll.x !== canvasScroll.x || newCanvasScroll.y !== canvasScroll.y) {
               canvasScroll = newCanvasScroll;
+              // hoveredPixel = getMouseOnCanvasPixel({ x: touch.pageX, y: touch.pageY });
               redraw();
             }
           } else if (e.touches.length === 2) {
@@ -259,28 +270,19 @@ export function PixelCanvas(props: { colour: number }) {
               return;
             }
 
-            pixelSize =
+            const newSize =
               Math.round((pixelSizeAtPinchStart! * (currentPinchDistance / lastPinchDistance)) / config.zoom.speed) *
-              config.zoom.speed;
+                config.zoom.speed -
+              pixelSize;
+            onZoomChange(newSize);
           }
         }}
         // onTouchEnd={(e) =>}
         onWheel={(e) => {
-          const zoomOut = e.deltaY > 0;
-          if (zoomOut) {
-            if (pixelSize - config.zoom.speed < config.zoom.minimum) return;
-            pixelSize -= config.zoom.speed;
-          } else {
-            if (pixelSize + config.zoom.speed > config.zoom.maximum) return;
-            pixelSize += config.zoom.speed;
-          }
-          if (canvas.current) {
-            viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
-            viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
-          }
-          canvasScroll = tryMoveCanvas(canvasScroll);
-          if (canvasScroll.x) hoveredPixel = getMouseOnCanvasPixel(e);
-          redraw();
+          onZoomChange(
+            e.deltaY > 0 ? -config.zoom.speed : config.zoom.speed,
+            getMouseOnCanvasPixel({ x: e.pageX, y: e.pageY })
+          );
         }}
       >
         Canvas not supported.

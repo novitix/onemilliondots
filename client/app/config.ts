@@ -4,9 +4,10 @@ const config = {
   canvasWidth: 1000,
   canvasHeight: 1000,
   defaultPixelSize: 20,
+  touchPixelSize: 10,
   zoom: {
     speed: 1, // Pixel change per scroll event
-    minimum: 5, // Minimum pixel size
+    minimum: 2, // Minimum pixel size
     maximum: 50, // Maximum pixel size
   },
 };
