@@ -179,6 +179,7 @@ export function PixelCanvas(props: { colour: number }) {
   const setPixel = (i: number, colour: number) => {
     if (!g.pixels) return;
     g.pixels[i] = colour;
+    redraw();
     fetch(`${config.apiUrl}/canvas/edits`, {
       method: "POST",
       body: JSON.stringify({ i, colour, uuid: uuidv4() }),

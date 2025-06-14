@@ -43,7 +43,7 @@ func InitCanvas(height int, width int) error {
 		Height: height,
 	}
 	for i := range mainCanvas.Pixels {
-		mainCanvas.Pixels[i] = 0b00010001 // 2 pixels per byte, initialise both pixels to 1.
+		mainCanvas.Pixels[i] = 0b11111111 // 2 pixels per byte, initialise both pixels to 15.
 	}
 
 	return nil
