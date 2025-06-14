@@ -123,7 +123,7 @@ func startConsolidation() {
 		count := consolidateEdits()
 		saveCanvas() // Save canvas state after each consolidation
 		fmt.Printf("Canvas consolidated and saved successfully to %s\n", SAVED_CANVAS_FILE)
-		time.Sleep((WAIT_BEFORE_CLEAR) * time.Millisecond)
+		time.Sleep(WAIT_BEFORE_CLEAR * time.Millisecond)
 		clearOldEdits(count)
 		fmt.Printf("Cleared %d edits\n", count)
 		consolidating = false
