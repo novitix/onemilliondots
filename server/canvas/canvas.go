@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
-const WAIT_BEFORE_CLEAR = 1500 // ms - should be longer than the client refetch interval
+const WAIT_BEFORE_CLEAR = 1500    // ms - should be longer than the client refetch interval
 const CONSOLIDATE_INTERVAL = 5000 // ms - how often to consolidate edits
+var consolidating = false         // Flag to prevent multiple consolidation goroutines (in case previous consolidation hangs)
+const SAVED_CANVAS_FILE = "canvasState"
 
 type Edit struct {
 	Uuid   string
@@ -44,8 +47,27 @@ func InitCanvas(height int, width int) error {
 		Width:  width,
 		Height: height,
 	}
-	for i := range mainCanvas.Pixels {
-		mainCanvas.Pixels[i] = 0b11111111 // 2 pixels per byte, initialise both pixels to 15.
+
+	createFreshCanvas := func() {
+		for i := range mainCanvas.Pixels {
+			mainCanvas.Pixels[i] = 0b11111111 // 2 pixels per byte, initialise both pixels to 15.
+		}
+	}
+
+	// Try to load the saved canvas state
+	_, err := os.Stat(SAVED_CANVAS_FILE)
+	if err != nil {
+		fmt.Printf("No saved canvas found, starting with a new canvas\n")
+		createFreshCanvas()
+	} else {
+		fmt.Printf("Loading saved canvas from %s\n", SAVED_CANVAS_FILE)
+		data, err := os.ReadFile(SAVED_CANVAS_FILE)
+		if err != nil {
+			createFreshCanvas()
+			os.Remove(SAVED_CANVAS_FILE) // Remove the corrupted file
+		}
+
+		mainCanvas.Pixels = data
 	}
 
 	go startConsolidation()
@@ -91,11 +113,24 @@ func CreateEdit(uuid string, i int, color byte) {
 
 func startConsolidation() {
 	for range time.Tick(CONSOLIDATE_INTERVAL * time.Millisecond) {
-		consolidateEdits()
+		if consolidating {
+			// Previous consolidation is still running, skip this iteration
+			fmt.Println("Skipping consolidation, already in progress")
+			continue
+		}
+
+		consolidating = true
+		count := consolidateEdits()
+		saveCanvas() // Save canvas state after each consolidation
+		fmt.Printf("Canvas consolidated and saved successfully to %s\n", SAVED_CANVAS_FILE)
+		time.Sleep((WAIT_BEFORE_CLEAR) * time.Millisecond)
+		clearOldEdits(count)
+		fmt.Printf("Cleared %d edits\n", count)
+		consolidating = false
 	}
 }
 
-func consolidateEdits() {
+func consolidateEdits() int {
 	for _, edit := range mainCanvas.Edits {
 		isPixelHigh := edit.I%2 == 0
 		bytePosition := edit.I / 2
@@ -108,13 +143,21 @@ func consolidateEdits() {
 	}
 
 	// Ensure all users have received the latest edits before clearing
-	count := len(mainCanvas.Edits)
+	return len(mainCanvas.Edits)
+}
+
+func clearOldEdits(count int) {
 	if count <= 0 || count > len(mainCanvas.Edits) {
 		return
 	}
-	
-	time.Sleep((WAIT_BEFORE_CLEAR) * time.Millisecond)
+	mainCanvas.Edits = mainCanvas.Edits[count:]
 
-	mainCanvas.Edits = mainCanvas.Edits[count:] // Clear the edits that have been consolidated
-	fmt.Printf("Consolidated and cleared %d edits\n", count)
+}
+
+func saveCanvas() {
+	err := os.WriteFile(SAVED_CANVAS_FILE, mainCanvas.Pixels, 0644)
+	if err != nil {
+		fmt.Printf("Error saving canvas: %s\n", err)
+		return
+	}
 }
