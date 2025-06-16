@@ -32,12 +32,14 @@ export function Home() {
     () => window.removeEventListener("wheel", handleScroll);
   }, []);
   return (
-    <main className="flex items-center justify-start pt-4 xl:pt-16 flex-col gap-3 max-w-screen h-svh">
-      <div>
-        <h1 className="text-3xl">One Million Dots</h1>
-        <p>Draw live with other users</p>
+    <main className="flex items-center justify-start flex-col gap-3 max-w-screen h-svh">
+      <div className="text-center space-y-3 my-4 xl:mt-8">
+        <div>
+          <h1 className="text-3xl">One Million Dots</h1>
+          <p>Draw live with other users</p>
+        </div>
+        <Picker colour={selectedColour} onColourChange={setSelectedColour} />
       </div>
-      <Picker colour={selectedColour} onColourChange={setSelectedColour} />
       <PixelCanvas colour={selectedColour} />
     </main>
   );

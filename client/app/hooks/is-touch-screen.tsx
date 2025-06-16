@@ -1,4 +1,4 @@
-export function isTouchScreen() {
+export function useIsTouchScreen() {
   if (typeof window === "undefined" || typeof navigator === "undefined") {
     return false;
   }

@@ -5,7 +5,7 @@ import config from "~/config";
 import { applyEdits, decodeCanvas } from "~/utils/decode-canvas";
 import { v4 as uuidv4 } from "uuid";
 import { useWindowSize } from "~/hooks/use-window-size";
-import { isTouchScreen } from "~/hooks/is-touch-screen";
+import { useIsTouchScreen } from "~/hooks/is-touch-screen";
 
 let pixelSize = 0; // Visual size of a pixel; This gets set in useEffect based on the screen type (touch or non-touch)
 
@@ -40,7 +40,7 @@ export function PixelCanvas(props: { colour: number }) {
   const [windowWidth, windowHeight] = useWindowSize();
   const canvas = useRef<HTMLCanvasElement>(null);
 
-  const isTouch = isTouchScreen();
+  const isTouch = useIsTouchScreen();
 
   const redraw = () => {
     if (!canvas.current || !g.pixels) return;
@@ -71,18 +71,24 @@ export function PixelCanvas(props: { colour: number }) {
     // console.log(`Redraw took ${endTime - startTime}ms`);
   };
 
-  const onZoomChange = (zoom: number, newHoveredPixel?: GridPosition) => {
+  const onZoomChange = (zoom: number, cursorPos: ScreenPosition) => {
     if (pixelSize + zoom < config.zoom.minimum || pixelSize + zoom > config.zoom.maximum) return;
+
+    // Try to keep the cursor position on the same pixel e.g. zooming towards hover/touched spot
+    hoveredPixel = getMouseOnCanvasPixel(cursorPos);
     pixelSize += zoom;
+    const newHoveredPixel = getMouseOnCanvasPixel(cursorPos);
+    canvasScroll = tryMoveCanvas({
+      x: canvasScroll.x + hoveredPixel.x - newHoveredPixel.x,
+      y: canvasScroll.y + hoveredPixel.y - newHoveredPixel.y,
+    });
 
     if (canvas.current) {
       viewportFitGridX = Math.floor(canvas.current.width / pixelSize) + 1;
       viewportFitGridY = Math.floor(canvas.current.height / pixelSize) + 1;
     }
-    canvasScroll = tryMoveCanvas(canvasScroll);
-    if (newHoveredPixel) {
-      hoveredPixel = newHoveredPixel;
-    }
+
+    hoveredPixel = getMouseOnCanvasPixel(cursorPos);
     redraw();
   };
 
@@ -187,7 +193,7 @@ export function PixelCanvas(props: { colour: number }) {
   };
 
   useEffect(() => {
-    if (isTouchScreen()) {
+    if (useIsTouchScreen()) {
       pixelSize = config.touchPixelSize; // Use a smaller pixel size for touch screens
     } else {
       pixelSize = config.defaultPixelSize; // Use the default pixel size for non-touch screens
@@ -271,19 +277,21 @@ export function PixelCanvas(props: { colour: number }) {
               return;
             }
 
+            const currentPinchCentre: ScreenPosition = {
+              x: (e.touches[0].pageX + e.touches[1].pageX) / 2,
+              y: (e.touches[0].pageY + e.touches[1].pageY) / 2,
+            };
+
             const newSize =
               Math.round((pixelSizeAtPinchStart! * (currentPinchDistance / lastPinchDistance)) / config.zoom.speed) *
                 config.zoom.speed -
               pixelSize;
-            onZoomChange(newSize);
+            onZoomChange(newSize, currentPinchCentre);
           }
         }}
         // onTouchEnd={(e) =>}
         onWheel={(e) => {
-          onZoomChange(
-            e.deltaY > 0 ? -config.zoom.speed : config.zoom.speed,
-            getMouseOnCanvasPixel({ x: e.pageX, y: e.pageY })
-          );
+          onZoomChange(e.deltaY > 0 ? -config.zoom.speed : config.zoom.speed, { x: e.pageX, y: e.pageY });
         }}
       >
         Canvas not supported.
