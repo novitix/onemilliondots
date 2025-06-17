@@ -16,22 +16,22 @@ export type Edit = {
 };
 
 type ScreenPosition = {
+  __brand: "screen";
   x: number;
   y: number;
-  __brand: "screen";
 };
 
 type GridPosition = {
+  __brand: "grid";
   x: number;
   y: number;
-  __brand: "grid";
 };
 
 let hoveredPixel: GridPosition | null = null;
 let ctx: CanvasRenderingContext2D | null = null;
-let canvasScroll: GridPosition = { __brand: "grid", x: 0, y: 0 };
+let canvasScroll: ScreenPosition = { __brand: "screen", x: 0, y: 0 };
 let pointerDownPos: ScreenPosition | null = null;
-let canvasScrollAtPointerDown: GridPosition | null = null;
+let canvasScrollAtPointerDown: ScreenPosition | null = null;
 let lastPinchDistance: number | null = null;
 let pixelSizeAtPinchStart: number | null = null;
 
@@ -50,27 +50,42 @@ export function PixelCanvas(props: { colour: number }) {
       ctx = canvas.current?.getContext("2d") || null;
     }
     if (!ctx) return;
-    // const startTime = performance.now();
+    const startTime = performance.now();
 
     ctx!.clearRect(0, 0, canvas.current.width, canvas.current.height);
 
     // We may zoom out, making the canvas smaller than the viewport
 
+    const canvasGridScroll: GridPosition = {
+      __brand: "grid",
+      x: Math.floor(canvasScroll.x / pixelSize),
+      y: Math.floor(canvasScroll.y / pixelSize),
+    };
+
+    const pixelOffsetX = canvasScroll.x % pixelSize;
+    const pixelOffsetY = canvasScroll.y % pixelSize;
+
     for (let x = 0; x < Math.min(viewportFitGridX!, config.canvasWidth); x++) {
       for (let y = 0; y < viewportFitGridY!; y++) {
         ctx!.fillStyle =
-          paletteMap.get(g.pixels![x + canvasScroll.x + (y + canvasScroll.y) * config.canvasWidth]) || "#000000";
-        ctx!.fillRect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+          paletteMap.get(g.pixels![x + canvasGridScroll.x + (y + canvasGridScroll.y) * config.canvasWidth]) ||
+          "#000000";
+        ctx!.fillRect(x * pixelSize - pixelOffsetX, y * pixelSize - pixelOffsetY, pixelSize, pixelSize);
       }
     }
 
     if (!hoveredPixel || isTouch) return;
     ctx!.lineWidth = 1;
     ctx!.strokeStyle = "#000";
-    ctx!.strokeRect(hoveredPixel?.x * pixelSize, hoveredPixel?.y * pixelSize, pixelSize, pixelSize);
+    ctx!.strokeRect(
+      hoveredPixel?.x * pixelSize - pixelOffsetX,
+      hoveredPixel?.y * pixelSize - pixelOffsetY,
+      pixelSize,
+      pixelSize
+    );
 
-    // const endTime = performance.now();
-    // console.log(`Redraw took ${endTime - startTime}ms`);
+    const endTime = performance.now();
+    console.log(`Redraw took ${endTime - startTime}ms`);
   };
 
   const onZoomChange = (zoom: number, cursorPos: ScreenPosition) => {
@@ -81,7 +96,7 @@ export function PixelCanvas(props: { colour: number }) {
     pixelSize += zoom;
     const newHoveredPixel = getMouseOnCanvasPixel(cursorPos);
     canvasScroll = tryMoveCanvas({
-      __brand: "grid",
+      __brand: "screen",
       x: canvasScroll.x + hoveredPixel.x - newHoveredPixel.x,
       y: canvasScroll.y + hoveredPixel.y - newHoveredPixel.y,
     });
@@ -95,7 +110,7 @@ export function PixelCanvas(props: { colour: number }) {
     redraw();
   };
 
-  const tryMoveCanvas = (newCanvasScroll: GridPosition) => {
+  const tryMoveCanvas = (newCanvasScroll: ScreenPosition) => {
     if (!canvas.current || !viewportFitGridY || !viewportFitGridX)
       throw new Error("Canvas not found in tryMoveCanvas()");
 
@@ -113,15 +128,15 @@ export function PixelCanvas(props: { colour: number }) {
     let needsRedraw = false;
     if (pointerDownPos && canvasScrollAtPointerDown && e.buttons === 1) {
       // Dragging
-      const delta: GridPosition = {
-        __brand: "grid",
-        x: Math.floor((pointerDownPos.x - e.pageX) / pixelSize),
-        y: Math.floor((pointerDownPos.y - e.pageY) / pixelSize),
+      const delta: ScreenPosition = {
+        __brand: "screen",
+        x: pointerDownPos.x - e.pageX,
+        y: pointerDownPos.y - e.pageY,
       };
       if (delta.x === 0 && delta.y === 0) return;
 
-      const newCanvasScroll: GridPosition = tryMoveCanvas({
-        __brand: "grid",
+      const newCanvasScroll: ScreenPosition = tryMoveCanvas({
+        __brand: "screen",
         x: canvasScrollAtPointerDown.x + delta.x,
         y: canvasScrollAtPointerDown.y + delta.y,
       });
@@ -178,7 +193,7 @@ export function PixelCanvas(props: { colour: number }) {
       x: pageX,
       y: pageY,
     };
-    canvasScrollAtPointerDown = { __brand: "grid", x: canvasScroll.x, y: canvasScroll.y };
+    canvasScrollAtPointerDown = { __brand: "screen", x: canvasScroll.x, y: canvasScroll.y };
   };
 
   const fetchCanvasFull = async () => {
@@ -240,7 +255,6 @@ export function PixelCanvas(props: { colour: number }) {
         onPointerMove={onPointerMove}
         onPointerDown={(e) => {
           if (e.buttons === 1) {
-            console.log("Pointer down", e.pageX, e.pageY);
             onPointerDown(e.pageX, e.pageY);
           }
         }}
