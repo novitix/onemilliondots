@@ -10,7 +10,9 @@ import (
 
 const WAIT_BEFORE_CLEAR = 1500    // ms - should be longer than the client refetch interval
 const CONSOLIDATE_INTERVAL = 5000 // ms - how often to consolidate edits
-var consolidating = false         // Flag to prevent multiple consolidation goroutines (in case previous consolidation hangs)
+const CONSOLIDATION_ENABLED = false
+
+var consolidating = false // Flag to prevent multiple consolidation goroutines (in case previous consolidation hangs)
 const SAVED_CANVAS_FILE = "canvasState"
 
 type Edit struct {
@@ -112,6 +114,11 @@ func CreateEdit(uuid string, i int, color byte) {
 }
 
 func startConsolidation() {
+	if !CONSOLIDATION_ENABLED {
+		fmt.Printf("Consolidation enabled: %v", CONSOLIDATION_ENABLED)
+		return
+	}
+
 	for range time.Tick(CONSOLIDATE_INTERVAL * time.Millisecond) {
 		if consolidating {
 			// Previous consolidation is still running, skip this iteration

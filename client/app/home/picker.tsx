@@ -1,4 +1,4 @@
-import { cn } from "~/utils/cn";
+import { cn } from "~/lib/utils";
 import { paletteMap } from "./palette";
 
 export function Picker(props: { colour: number; onColourChange(index: number): void }) {
@@ -8,8 +8,8 @@ export function Picker(props: { colour: number; onColourChange(index: number): v
       {colours.map(([index, colour]) => (
         <div
           key={index}
-          className={cn("w-[40px] h-[40px] rounded-md cursor-pointer transition-transform hover:scale-[110%]", {
-            "border-2 scale-[110%]": index === props.colour,
+          className={cn("w-[40px] h-[40px] rounded-md cursor-pointer transition-all border-4 border-transparent", {
+            "scale-[115%] border-accent/50": index === props.colour,
           })}
           onClick={() => props.onColourChange(index)}
           style={{ backgroundColor: colour }}
