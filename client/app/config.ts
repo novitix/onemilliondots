@@ -3,11 +3,11 @@ const config = {
   refetchInterval: 1000, // ms
   gridWidth: 1000,
   gridHeight: 1000,
-  basePixelSize: 10,
+  basePixelSize: 1,
   zoom: {
-    speed: 0.1, // zoom multiplier change
-    minimum: 0.1, // Minimum multiplier
-    maximum: 1.5, // Maximum multiplier
+    speed: 0.5, // zoom multiplier change
+    minimum: 2, // Minimum multiplier
+    maximum: 20, // Maximum multiplier
   },
   fps: {
     normal: 60,

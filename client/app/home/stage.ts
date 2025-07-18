@@ -13,11 +13,18 @@ export class Stage {
   canvasImage: CanvasImage;
   scroll: ScreenPosition = { __brand: "screen", x: 0, y: 0 };
   hoveredPixel: GridPosition | null = null;
-  zoom: number = 1;
+  zoom: number = 10;
+  canvasSize: { width: number; height: number };
 
-  constructor(canvasCtx: CanvasRenderingContext2D, gridWidth: number, gridHeight: number) {
+  constructor(
+    canvasCtx: CanvasRenderingContext2D,
+    gridWidth: number,
+    gridHeight: number,
+    canvasSize: { width: number; height: number }
+  ) {
     this.ctx = canvasCtx;
     this.canvasImage = new CanvasImage(gridWidth, gridHeight);
+    this.canvasSize = canvasSize;
   }
 
   getScaledPixelSize() {
@@ -25,7 +32,8 @@ export class Stage {
   }
 
   draw() {
-    this.ctx.clearRect(0, 0, 20000, 20000);
+    this.ctx.imageSmoothingEnabled = false;
+    this.ctx.clearRect(0, 0, this.canvasSize.width, this.canvasSize.height);
     this.ctx.drawImage(
       this.canvasImage.image,
       -this.scroll.x,

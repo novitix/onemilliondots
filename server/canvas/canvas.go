@@ -10,7 +10,7 @@ import (
 
 const WAIT_BEFORE_CLEAR = 1500    // ms - should be longer than the client refetch interval
 const CONSOLIDATE_INTERVAL = 5000 // ms - how often to consolidate edits
-const CONSOLIDATION_ENABLED = false
+const CONSOLIDATION_ENABLED = true
 
 var consolidating = false // Flag to prevent multiple consolidation goroutines (in case previous consolidation hangs)
 const SAVED_CANVAS_FILE = "canvasState"

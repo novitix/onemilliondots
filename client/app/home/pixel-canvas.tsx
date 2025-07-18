@@ -23,7 +23,6 @@ export type GridPosition = {
   y: number;
 };
 
-let hoveredPixel: GridPosition | null = null;
 let ctx: CanvasRenderingContext2D | null = null;
 let pointerDownPos: ScreenPosition | null = null;
 let canvasScrollAtPointerDown: ScreenPosition | null = null;
@@ -35,25 +34,28 @@ let stage: Stage;
 let redrawClock: NodeJS.Timeout;
 
 export function PixelCanvas(props: { colour: number; fps: number }) {
-  const [windowWidth, windowHeight] = useWindowSize();
   const canvas = useRef<HTMLCanvasElement>(null);
-
-  const isTouch = useIsTouchScreen();
+  const [windowWidth, windowHeight] = useWindowSize();
+  const isTouchScreen = useIsTouchScreen();
 
   const onZoomChange = (zoom: number, cursorPos: ScreenPosition) => {
     if (!canvas.current) return;
     if (stage.zoom + zoom < config.zoom.minimum || stage.zoom + zoom > config.zoom.maximum) return;
 
     // Try to keep the cursor position on the same pixel e.g. zooming towards hover/touched spot
-    hoveredPixel = screenToGridPosition(cursorPos);
+
     stage.zoom += zoom;
+    const zoomChangeRatio = stage.zoom / (stage.zoom - zoom);
+
     stage.scroll = tryMoveCanvas({
       __brand: "screen",
-      x: stage.scroll.x + (cursorPos.x - canvas.current.offsetLeft) * zoom,
-      y: stage.scroll.y + (cursorPos.y - canvas.current.offsetTop) * zoom,
+      x: stage.scroll.x * zoomChangeRatio + ((cursorPos.x - canvas.current.offsetLeft) * zoom) / (stage.zoom - zoom),
+      y: stage.scroll.y * zoomChangeRatio + ((cursorPos.y - canvas.current.offsetTop) * zoom) / (stage.zoom - zoom),
     });
 
-    hoveredPixel = screenToGridPosition(cursorPos);
+    if (!isTouchScreen) {
+      stage.hoveredPixel = screenToGridPosition(cursorPos);
+    }
   };
 
   const tryMoveCanvas = (newCanvasScroll: ScreenPosition) => {
@@ -65,14 +67,12 @@ export function PixelCanvas(props: { colour: number; fps: number }) {
       newCanvasScroll.x = Math.max(stage.canvasImage.totalWidth * stage.zoom - canvasSize.width, 0);
     if (newCanvasScroll.y + canvasSize.height > stage.canvasImage.totalHeight * stage.zoom)
       newCanvasScroll.y = Math.max(stage.canvasImage.totalHeight * stage.zoom - canvasSize.height, 0);
-    // if (newCanvasScroll.y + viewportFitGridY > config.gridHeight + 1)
-    //   newCanvasScroll.y = Math.max(config.gridHeight + 1 - viewportFitGridY, 0);
     return newCanvasScroll;
   };
 
   const onPointerMove = (e: PointerEvent<HTMLCanvasElement>) => {
-    if (!canvas.current) return;
-    let needsRedraw = false;
+    if (!canvas.current || isTouchScreen) return;
+
     if (pointerDownPos && canvasScrollAtPointerDown && e.buttons === 1) {
       // Dragging
       const delta: ScreenPosition = {
@@ -92,7 +92,9 @@ export function PixelCanvas(props: { colour: number; fps: number }) {
     }
 
     // Hovering pixel
-    stage.hoveredPixel = screenToGridPosition({ __brand: "screen", x: e.pageX, y: e.pageY });
+    if (!isTouchScreen) {
+      stage.hoveredPixel = screenToGridPosition({ __brand: "screen", x: e.pageX, y: e.pageY });
+    }
   };
 
   const screenToGridPosition = (screenPosition: ScreenPosition): GridPosition => {
@@ -113,8 +115,6 @@ export function PixelCanvas(props: { colour: number; fps: number }) {
     ) {
       const { x, y } = screenToGridPosition({ __brand: "screen", x: e.pageX, y: e.pageY });
       setPixel(y * config.gridWidth + x, props.colour);
-    } else if (pointerDownPos) {
-      // canvasScroll = { x: canvasScroll.x + curDragScoll.x, y: canvasScroll.y + curDragScoll.y };
     }
     pointerDownPos = null;
     canvasScrollAtPointerDown = null;
@@ -153,26 +153,28 @@ export function PixelCanvas(props: { colour: number; fps: number }) {
     if (!canvas.current) return;
     canvas.current.width = canvas.current.clientWidth;
     canvas.current.height = canvas.current.clientHeight;
-    canvas.current.width = canvas.current.clientWidth * window.devicePixelRatio;
-    canvas.current.height = canvas.current.clientHeight * window.devicePixelRatio;
     canvasSize = { width: canvas.current.clientWidth, height: canvas.current.clientHeight };
 
     ctx = canvas.current?.getContext("2d") || null;
     if (!ctx) return;
-    stage = new Stage(ctx, config.gridWidth, config.gridHeight);
-  }, [canvas.current, canvas.current?.clientWidth, canvas.current?.clientHeight]);
+    if (stage) {
+      stage.canvasSize = { width: canvas.current.width, height: canvas.current.height };
+    } else {
+      stage = new Stage(ctx, config.gridWidth, config.gridHeight, {
+        width: canvas.current.width,
+        height: canvas.current.height,
+      });
+    }
+  }, [canvas.current, canvas.current?.clientWidth, canvas.current?.clientHeight, windowWidth, windowHeight]);
 
   useEffect(() => {
-    // if (useIsTouchScreen()) {
-    //   stage.pixelSize = config.touchPixelSize; // Use a smaller pixel size for touch screens
-    // } else {
-    //   stage.pixelSize = config.defaultPixelSize; // Use the default pixel size for non-touch screens
-    // }
     fetchCanvasFull().then(async (data) => {
       g.pixels = data;
       stage.canvasImage.applyFull(g.pixels);
     });
+  });
 
+  useEffect(() => {
     setInterval(async () => {
       if (!g.pixels) return;
       const canvasEdits: Edit[] = await fetch(`${config.apiUrl}/canvas/edits`).then((data) => data.json());
@@ -193,6 +195,7 @@ export function PixelCanvas(props: { colour: number; fps: number }) {
       <canvas
         ref={canvas}
         className="w-full h-full touch-auto"
+        onMouseLeave={() => (stage.hoveredPixel = null)}
         onPointerMove={onPointerMove}
         onPointerDown={(e) => {
           if (e.buttons === 1) {
@@ -208,13 +211,11 @@ export function PixelCanvas(props: { colour: number; fps: number }) {
         onTouchMove={(e) => {
           if (!canvas.current) return;
           e.stopPropagation();
-          if (e.touches.length === 1) {
-            // Dragging
-            const touch = e.touches[0];
+          const handleTouchDrag = ({ x, y }: ScreenPosition) => {
             const delta: ScreenPosition = {
               __brand: "screen",
-              x: Math.floor(pointerDownPos!.x - touch.pageX),
-              y: Math.floor(pointerDownPos!.y - touch.pageY),
+              x: Math.floor(pointerDownPos!.x - x),
+              y: Math.floor(pointerDownPos!.y - y),
             };
             if (delta.x === 0 && delta.y === 0) return;
 
@@ -222,6 +223,14 @@ export function PixelCanvas(props: { colour: number; fps: number }) {
               __brand: "screen",
               x: canvasScrollAtPointerDown!.x + delta.x,
               y: canvasScrollAtPointerDown!.y + delta.y,
+            });
+          };
+
+          if (e.touches.length === 1) {
+            handleTouchDrag({
+              __brand: "screen",
+              x: e.touches[0].pageX,
+              y: e.touches[0].pageY,
             });
           } else if (e.touches.length === 2) {
             // Handle pinch-to-zoom
@@ -247,6 +256,9 @@ export function PixelCanvas(props: { colour: number; fps: number }) {
               stage.getScaledPixelSize();
             onZoomChange(newSize, currentPinchCentre);
           }
+        }}
+        onTouchEnd={() => {
+          lastPinchDistance = null;
         }}
         onWheel={(e) => {
           onZoomChange(e.deltaY > 0 ? -config.zoom.speed : config.zoom.speed, {
